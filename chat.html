@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chat</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    #chatBox { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
+    #messageInput, #searchInput { width: 100%; padding: 10px; margin: 5px 0; }
+    nav { margin-top: 20px; display: flex; gap: 10px; }
+    .msg { margin: 5px 0; }
+    #logoutBtn {
+      position: fixed;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      cursor: pointer;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Chat Page</h2>
+  <nav>
+    <button onclick="location.href='home.html'">Home</button>
+    <button onclick="location.href='friends.html'">Friends</button>
+    <button disabled>Chat</button>
+  </nav>
+  <input type="text" id="searchInput" placeholder="Search user to chat..." />
+  <div id="searchResults"></div>
+
+  <div id="chatBox"></div><input type="text" id="messageInput" placeholder="Type your message..." />
+  <button onclick="sendMessage()">Send</button>
+
+
+
+  <button id="logoutBtn">Logout</button>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      where,
+      getDocs,
+      addDoc,
+      doc,
+      getDoc,
+      onSnapshot,
+      orderBy
+    } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-firestore.js";
+
+  // Your Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyBJAbrLdm187pSOzcVxvxCWsxtbm8jqqv4",
+    authDomain: "chatapp-929e8.firebaseapp.com",
+    projectId: "chatapp-929e8",
+    storageBucket: "chatapp-929e8.appspot.com",
+    messagingSenderId: "229423751830",
+    appId: "1:229423751830:web:430211f0cf5a66609458b7"
+  };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUserUID = null;
+    let chattingWithUID = null;
+
+    const chatBox = document.getElementById("chatBox");const messageInput = document.getElementById("messageInput");
+    const searchInput = document.getElementById("searchInput");
+    const searchResults = document.getElementById("searchResults");
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user) return window.location.href = "login.html";
+      currentUserUID = user.uid;
+    });
+
+    searchInput.addEventListener("input", async () => {
+      const keyword = searchInput.value.trim();
+      searchResults.innerHTML = "";
+
+      if (keyword.length < 3) return;
+
+      const q = query(collection(db, "users"), where("username", "==", keyword));
+      const snap = await getDocs(q);
+
+      snap.forEach((docSnap) => {
+        if (docSnap.id !== currentUserUID) {
+          const div = document.createElement("div");
+          div.textContent = "Chat with " + docSnap.data().username;
+          div.style.cursor = "pointer";
+          div.onclick = () => {
+            chattingWithUID = docSnap.id;
+            loadMessages();
+          };
+          searchResults.appendChild(div);
+        }
+      });
+    });
+
+    async function sendMessage() {
+      const text = messageInput.value.trim();
+      if (!text || !chattingWithUID) return;
+
+      await addDoc(collection(db, "messages"), {
+        from: currentUserUID,to: chattingWithUID,
+        text,
+        timestamp: Date.now()
+      });
+
+      messageInput.value = "";
+    }
+
+    function loadMessages() {
+      chatBox.innerHTML = "";
+      const q = query(
+        collection(db, "messages"),
+        orderBy("timestamp")
+      );
+
+      onSnapshot(q, (snap) => {
+        chatBox.innerHTML = "";
+        snap.forEach((docSnap) => {
+          const msg = docSnap.data();
+          const isBetweenUsers =
+            (msg.from === currentUserUID && msg.to === chattingWithUID) ||
+            (msg.from === chattingWithUID && msg.to === currentUserUID);
+
+          if (isBetweenUsers) {
+            const div = document.createElement("div");
+            div.className = "msg";
+            div.textContent = `msg.from === currentUserUID ? "You" : "Them":{msg.text}`;
+            chatBox.appendChild(div);
+          }
+        });
+        chatBox.scrollTop = chatBox.scrollHeight;
+      });
+    }
+
+    // Logout
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      const confirmLogout = confirm("Are you sure you want to logout?");
+      if (confirmLogout) {
+        await signOut(auth);
+        window.location.href = "login.html";
+      }
+    });
+  </script>
+</body>
+</html>

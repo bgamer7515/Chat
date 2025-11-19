@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Friends</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    section { margin-bottom: 30px; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 10px 0; }
+    button { margin-left: 10px; padding: 5px 10px; cursor: pointer; }
+    nav { margin-top: 20px; display: flex; gap: 10px; }
+    #logoutBtn {
+      position: fixed;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      cursor: pointer;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Friends Center</h2>
+
+  <section>
+    <h3>Sent Requests</h3>
+    <ul id="sentRequestsList"></ul>
+  </section>
+
+  <section>
+    <h3>Received Requests</h3>
+    <ul id="receivedRequestsList"></ul>
+  </section><section>
+    <h3>Your Friends</h3>
+    <ul id="friendsList"></ul>
+  </section>
+
+  <nav>
+    <button onclick="location.href='home.html'">Home</button>
+    <button disabled>Friends</button>
+    <button onclick="location.href='chat.html'">Chat</button>
+  </nav>
+
+  <button id="logoutBtn">Logout</button>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signOut
+    } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-auth.js";
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+      collection,
+      getDocs,
+      query,
+      where,
+      updateDoc,
+      deleteDoc,
+      addDoc
+    } from "https://www.gstatic.com/firebasejs/10.5.2/firebase-firestore.js";
+
+
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUserUID = null;
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return window.location.href = "login.html";
+      currentUserUID = user.uid;
+
+      loadSentRequests();const acceptBtn = document.createElement("button");
+          acceptBtn.textContent = "Accept";
+          acceptBtn.onclick = async () => {
+            await addDoc(collection(db, "friends"), {
+              user1: currentUserUID,
+              user2: request.from
+            });
+            await deleteDoc(doc(db, "friend_requests", docSnap.id));
+            loadReceivedRequests();
+            loadFriends();
+          };
+
+          const declineBtn = document.createElement("button");
+          declineBtn.textContent = "Decline";
+          declineBtn.onclick = async () => {
+            await deleteDoc(doc(db, "friend_requests", docSnap.id));
+            loadReceivedRequests();
+          };
+
+          li.appendChild(acceptBtn);
+          li.appendChild(declineBtn);
+          receivedList.appendChild(li);
+        }
+      }
+    }
+
+    async function loadFriends() {
+      const friendsList = document.getElementById("friendsList");
+      friendsList.innerHTML = "";
+
+      const q1 = query(collection(db, "friends"), where("user1", "==", currentUserUID));
+      const q2 = query(collection(db, "friends"), where("user2", "==", currentUserUID));
+
+      const snap1 = await getDocs(q1);
+      const snap2 = await getDocs(q2);
+
+      const friendUIDs = new Set();loadReceivedRequests();
+      loadFriends();
+    });
+
+    async function loadSentRequests() {
+      const sentList = document.getElementById("sentRequestsList");
+      sentList.innerHTML = "";
+
+      const q = query(collection(db, "friend_requests"), where("from", "==", currentUserUID));
+      const snap = await getDocs(q);
+
+      for (const docSnap of snap.docs) {
+        const request = docSnap.data();
+        const toUser = await getDoc(doc(db, "users", request.to));
+        if (toUser.exists()) {
+          const li = document.createElement("li");
+          li.textContent = toUser.data().username;
+          sentList.appendChild(li);
+        }
+      }
+    }
+
+    async function loadReceivedRequests() {
+      const receivedList = document.getElementById("receivedRequestsList");
+      receivedList.innerHTML = "";
+
+      const q = query(collection(db, "friend_requests"), where("to", "==", currentUserUID));
+      const snap = await getDocs(q);
+
+      for (const docSnap of snap.docs) {
+        const request = docSnap.data();
+        const fromUser = await getDoc(doc(db, "users", request.from));
+        if (fromUser.exists()) {
+          const li = document.createElement("li");
+          li.textContent = fromUser.data().username;snap1.forEach(doc => friendUIDs.add(doc.data().user2));
+      snap2.forEach(doc => friendUIDs.add(doc.data().user1));
+
+      for (const uid of friendUIDs) {
+        const userDoc = await getDoc(doc(db, "users", uid));
+        if (userDoc.exists()) {
+          const li = document.createElement("li");
+          li.textContent = userDoc.data().username;
+          friendsList.appendChild(li);
+        }
+      }
+    }
+
+    // Logout button
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      const confirmLogout = confirm("Are you sure you want to logout?");
+      if (confirmLogout) {
+        await signOut(auth);
+        window.location.href = "login.html";
+      }
+    });
+  </script>
+</body>
+</html>
